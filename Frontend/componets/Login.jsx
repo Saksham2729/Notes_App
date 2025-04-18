@@ -1,10 +1,6 @@
-import * as React from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
-import "../styles/login.css";
-import { Link } from 'react-router-dom';
-import Snackbar from '@mui/material/Snackbar';
-
+import { useNavigate, Link } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -12,51 +8,59 @@ import {
   Button,
   Paper,
   FormControl,
+  Snackbar,
 } from '@mui/material';
+import '../styles/login.css';
 
 const LoginFinal = () => {
-  const [email, setEmail] = React.useState('');
-  const [password, setPassword] = React.useState('');
-  const [open, setOpen] = React.useState(false);
-  const [snackbarMsg, setSnackbarMsg] = React.useState('');
+  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [snackbar, setSnackbar] = useState({ open: false, message: '' });
   const navigate = useNavigate();
+  const url='http://localhost:5000/api/';
+
+  React.useEffect(() => {
+    const token = localStorage.getItem('token');
+    console.log(token)
+    if (token) {
+      navigate('/home');
+    }
+  }, [navigate]);
+
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     try {
-      const response = await axios.post('http://localhost:5000/api/user/login', {
+      const { email, password } = formData;
+      const { data } = await axios.post(`${url}user/login`, {
         email,
         password,
       });
 
-      // Assuming the response contains userId
-      const { userId, token } = response.data;
+      localStorage.setItem('userId', data.userId);
+      localStorage.setItem('token', data.token);
 
-      // Store userId in localStorage
-
-      localStorage.setItem('userId', userId);
-      localStorage.setItem('token', token);
-
-
-      setSnackbarMsg('Logged in successfully!');
-      setOpen(true);
-      setTimeout(() => navigate('/'), 1500); 
+      setSnackbar({ open: true, message: 'Logged in successfully!' });
+      setTimeout(() => navigate('/home'), 1500);
     } catch (error) {
-      setSnackbarMsg('Login failed. Please check your credentials.');
-      setOpen(true);
+      setSnackbar({ open: true, message: 'Login failed. Please check your credentials.' });
     }
   };
 
-  const handleClose = (event, reason) => {
+  const handleCloseSnackbar = (event, reason) => {
     if (reason === 'clickaway') return;
-    setOpen(false);
+    setSnackbar((prev) => ({ ...prev, open: false }));
   };
 
   return (
     <main>
       <Paper elevation={3} className="login-container">
-        <Box sx={{ mb: 3 }}>
+        <Box mb={3}>
           <Typography variant="h4" component="h1" className="login-heading">
             Login
           </Typography>
@@ -66,9 +70,10 @@ const LoginFinal = () => {
           <FormControl fullWidth margin="normal">
             <TextField
               label="Email"
+              name="email"
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={formData.email}
+              onChange={handleChange}
               required
             />
           </FormControl>
@@ -76,9 +81,10 @@ const LoginFinal = () => {
           <FormControl fullWidth margin="normal">
             <TextField
               label="Password"
+              name="password"
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              value={formData.password}
+              onChange={handleChange}
               required
             />
           </FormControl>
@@ -95,10 +101,10 @@ const LoginFinal = () => {
           </Button>
 
           <Snackbar
-            open={open}
+            open={snackbar.open}
             autoHideDuration={3000}
-            onClose={handleClose}
-            message={snackbarMsg}
+            onClose={handleCloseSnackbar}
+            message={snackbar.message}
             anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
           />
         </form>
@@ -115,4 +121,3 @@ const LoginFinal = () => {
 };
 
 export default LoginFinal;
-

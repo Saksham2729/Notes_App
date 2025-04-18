@@ -1,25 +1,40 @@
-const express = require('express');
-const router = express.Router();
-const {
+import express from 'express';
+import {
   getNotes,
   createNote,
   updateNote,
   deleteNote
-} = require('../controller/notes.controller');
+} from '../controller/notes.controller.js';
+import { protect } from "../Middleware/authMiddleware.js"
 
-// Middleware to protect routes 
-const protect = require('../Middleware/authMiddleware');
+const router = express.Router();
 
-// All routes are protected
-router.route('/')
-  .post(protect, createNote);
+/**
+ * @route POST /createNote
+ * @desc Create a new note for the authenticated user
+ * @access Private
+ */
+router.post('/createNote', protect, createNote);
 
-router.route('/:userId')
-  .get(protect, getNotes)
+/**
+ * @route POST /getNote
+ * @desc Retrieve notes for the authenticated user
+ * @access Private
+ */
+router.post('/getNote', protect, getNotes);
 
+/**
+ * @route POST /delete
+ * @desc Delete a note belonging to the authenticated user
+ * @access Private
+ */
+router.post('/delete', protect, deleteNote);
 
-router.route('/:id')
-  .put(protect, updateNote)
-  .delete(protect, deleteNote);
+/**
+ * @route POST /update
+ * @desc Update an existing note for the authenticated user
+ * @access Private
+ */
+router.post('/update', protect, updateNote);
 
-module.exports = router;
+export default router;

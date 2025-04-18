@@ -14,7 +14,20 @@ import { Link } from "react-router-dom";
 import routes from "../helper/dummy";
 import "../styles/login.css";
 
+const FIELD_NAMES = {
+  NAME: "name",
+  EMAIL: "email",
+  PASSWORD: "password",
+  CONFIRM_PASSWORD: "confirmPassword",
+};
+
+const REGEX_PATTERNS = {
+  EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+  PASSWORD: /^(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$/
+};
+
 export default function RegisterFinal() {
+  const url = 'http://localhost:5000/api/'
   const [formData, setFormData] = React.useState({
     name: "",
     email: "",
@@ -33,11 +46,16 @@ export default function RegisterFinal() {
   const [loading, setLoading] = React.useState(false);
   const { fields } = routes.register;
   const navigate = useNavigate();
+  React.useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      navigate('/home');
+    }
+  }, [navigate]);
 
   const validate = (field, value) => {
     const newErrors = { ...errors };
-
-    if (field === "name") {
+    if (field === FIELD_NAMES.NAME) {
       if (!value.trim()) {
         newErrors.name = "Name is required";
       } else if (/\d/.test(value)) {
@@ -47,19 +65,17 @@ export default function RegisterFinal() {
       }
     }
 
-    if (field === "email") {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      newErrors.email = emailRegex.test(value) ? "" : "Invalid email address";
+    if (field === FIELD_NAMES.EMAIL) {
+      newErrors.email = REGEX_PATTERNS.EMAIL.test(value) ? "" : "Invalid email address";
     }
 
-    if (field === "password") {
-      const complexPassRegex = /^(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$/;
-      newErrors.password = complexPassRegex.test(value)
-        ? ""
-        : "Password must be at least 8 characters, include a number and uppercase letter";
+    if (field === FIELD_NAMES.PASSWORD) {
+      newErrors.password = REGEX_PATTERNS.PASSWORD.test(value)
+      ? ""
+      : "Password must be at least 8 characters, include a number and uppercase letter";
     }
 
-    if (field === "confirmPassword") {
+    if (field === FIELD_NAMES.CONFIRM_PASSWORD) {
       newErrors.confirmPassword =
         value === formData.password ? "" : "Passwords do not match";
     }
@@ -94,10 +110,9 @@ export default function RegisterFinal() {
       setLoading(true);
       try {
         const response = await axios.post(
-          "http://localhost:5000/api/user/register",
+          `${url}user/register`,
           formData
         );
-        console.log("Form submitted:", response.data);
         showSnackbar("Registration successful!");
         setTimeout(() => navigate("/login"), 2000);
       } catch (error) {
@@ -175,8 +190,8 @@ export default function RegisterFinal() {
         }}
         ContentProps={{
           sx: {
-            backgroundColor: "#333", 
-            color: "#fff", 
+            backgroundColor: "#333",
+            color: "#fff",
             fontWeight: "500",
           },
         }}

@@ -1,9 +1,23 @@
-const { User } = require("../model/user");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const { REGEX, STATUS_CODE, MESSAGES, SUCCESS } = require("../contant");
+import { User } from "../model/user.js";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import { REGEX, STATUS_CODE, MESSAGES, SUCCESS } from "../contant.js";
 
-const registerUser = async (req, res) => {
+/**
+ * Registers a new user in the system.
+ *
+ * @async
+ * @function registerUser
+ * @param {Object} req - Express request object.
+ * @param {Object} req.body - Request body containing user registration info.
+ * @param {string} req.body.name - Name of the user.
+ * @param {string} req.body.email - Email address of the user.
+ * @param {string} req.body.password - Password provided by the user.
+ * @param {string} req.body.confirmPassword - Confirmation of the password.
+ * @param {Object} res - Express response object.
+ * @returns {Promise<void>}
+ */
+export const registerUser = async (req, res) => {
   const { name, email, password, confirmPassword } = req.body;
 
   try {
@@ -77,7 +91,19 @@ const registerUser = async (req, res) => {
   }
 };
 
-const loginUser = async (req, res) => {
+/**
+ * Logs in a user by verifying credentials and returns a JWT token.
+ *
+ * @async
+ * @function loginUser
+ * @param {Object} req - Express request object.
+ * @param {Object} req.body - Request body containing login info.
+ * @param {string} req.body.email - User's email.
+ * @param {string} req.body.password - User's password.
+ * @param {Object} res - Express response object.
+ * @returns {Promise<void>}
+ */
+export const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   try {
@@ -108,12 +134,19 @@ const loginUser = async (req, res) => {
       expiresIn: "365d",
     });
 
-    res.status(STATUS_CODE.OK).json({
-      success: SUCCESS.TRUE,
-      message: MESSAGES.LOGIN_SUCCESS(user.name),
-      token,
-      userId: user._id,
-    });
+    res
+      .cookie("token", token, {
+        httpOnly: true,
+        maxAge: 365 * 24 * 60 * 60 * 1000, // 1 year
+      })
+      .status(STATUS_CODE.OK)
+      .json({
+        success: SUCCESS.TRUE,
+        message: MESSAGES.LOGIN_SUCCESS(user.name),
+        userId: user._id,
+        token: token,
+      });
+
   } catch (error) {
     res.status(STATUS_CODE.SERVER_ERROR).json({
       success: SUCCESS.FALSE,
@@ -123,8 +156,15 @@ const loginUser = async (req, res) => {
   }
 };
 
-module.exports = {
-  registerUser,
-  loginUser,
+/**
+ * Logs out a user by clearing the authentication cookie.
+ *
+ * @function logoutUser
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ * @returns {void}
+ */
+export const logoutUser = (req, res) => {
+  res.clearCookie("token"); // optionally clear the cookie
+  res.status(STATUS_CODE.CREATED).json({ message: "Logged out successfully" });
 };
-

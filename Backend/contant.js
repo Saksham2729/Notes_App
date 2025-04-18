@@ -1,5 +1,3 @@
-// constants.js
-
 const DB_NAME = "notesapp";
 
 const REGEX = {
@@ -14,6 +12,7 @@ const STATUS_CODE = {
   UNAUTHORIZED: 401,
   CONFLICT: 409,
   SERVER_ERROR: 500,
+  PAGE_NOT_FOUND:404
 };
 
 const MESSAGES = {
@@ -28,20 +27,104 @@ const MESSAGES = {
   INVALID_CREDENTIALS: "Invalid email or password",
   LOGIN_SUCCESS: (name) => `Welcome ${name}`,
   SERVER_ERROR: "Server error",
+  UNAUTHORIZED:'Unauthorized, please login',
+  NOT_FOUND:'User not found',
+  INVALID_TOKEN:'Unauthorized: Invalid token',
+  NO_NOTE:'No notes found for this user',
+  NOTE_ADDED:"Note added successfully",
+  NOT_AUTH:"Not authorized.",
+  NOTE_DELETE:"Note deleted successfully." ,
+  FAIL_TO_DELETE:"Failed to delete note.",
+  NOT_UPDATE_NOTE:"Failed to update note."
 };
+
 
 const SUCCESS = {
   TRUE: true,
   FALSE: false,
 };
 
-module.exports = {
+export {
   DB_NAME,
   REGEX,
   STATUS_CODE,
   MESSAGES,
   SUCCESS,
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 // const consts = {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
   CssBaseline,
   Box,
@@ -16,39 +17,66 @@ import {
   Snackbar
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import { field_name } from '../helper/constant';
 
 export default function HomePage() {
   const navigate = useNavigate();
-
   const [notes, setNotes] = useState([]);
-  const [newNote, setNewNote] = useState({ title: '', content: '' });
+  const [newNote, setNewNote] = useState({ title: '', description: '' });
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [errors, setErrors] = useState({});
   const [editIndex, setEditIndex] = useState(null);
-
+  const [refresh, setRefresh] = useState(false);
   const [snack, setSnack] = useState({
     open: false,
     message: '',
     vertical: 'top',
     horizontal: 'center'
   });
-
   const [deleteDialog, setDeleteDialog] = useState({
     open: false,
     index: null
   });
 
-  useEffect(() => {
-    const storedNotes = localStorage.getItem('notes');
-    if (storedNotes) {
-      setNotes(JSON.parse(storedNotes));
+  const token = localStorage.getItem('token');
+
+  const url='http://localhost:5000/api/'
+
+  const fetchNotes = async () => {
+    try {
+      const userId = localStorage.getItem('userId');
+
+      if (!userId || !token) {
+        navigate("/login")
+        return;
+      }
+
+      const response = await axios.post(
+        `${url}notes/getNote`,
+        { userId },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          credentials: 'include',
+        }
+      );
+      console.log('Notes fetched successfully:', response.data);
+      setNotes(response.data);
+    } catch (error) {
+      if (error.response) {
+        console.error('Error fetching notes:', error.response.data.message);
+      } else {
+        console.error('Error while making the API request:', error.message);
+      }
     }
-  }, []);
+  };
 
   useEffect(() => {
-    localStorage.setItem('notes', JSON.stringify(notes));
-  }, [notes]);
+    fetchNotes();
+  }, [refresh]);
 
   const showSnackbar = (message) => {
     setSnack({
@@ -62,44 +90,103 @@ export default function HomePage() {
   const handleCloseSnackbar = () => {
     setSnack((prev) => ({ ...prev, open: false }));
   };
-
-  const handleLogout = () => {
-    showSnackbar('Logged out successfully!');
-    setTimeout(() => navigate('/login'), 500);
+  const removeUserData = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('userId');
+  };
+  
+  const handleLogout = async () => {
+    try {
+      await axios.post(`${url}user/logout`, null, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      removeUserData();
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      removeUserData();
+      navigate('/login');
+    }
   };
 
   const handleNoteChange = (e) => {
     const { name, value } = e.target;
-    if (name === 'content' && value.length > 200) return;
+    if (name === field_name.description && value.length > 200) return;
 
     setNewNote((prev) => ({ ...prev, [name]: value }));
     setErrors({});
   };
 
-  const saveNote = () => {
-    if (newNote.title.trim() === '' || newNote.content.trim() === '') {
-      setErrors({ newNote: 'Title and content are required!' });
+  const saveNote = async () => {
+    if (newNote.title.trim() === '' || newNote.description.trim() === '') {
+      setErrors({ newNote: 'Title and description are required!' });
       return;
     }
 
-    let updatedNotes = [...notes];
-    if (editIndex !== null) {
-      updatedNotes[editIndex] = newNote;
-      showSnackbar('Note updated successfully');
-    } else {
-      updatedNotes.push(newNote);
-      showSnackbar('Note added successfully');
-    }
+    const noteData = {
+      id: newNote._id,
+      title: newNote.title,
+      description: newNote.description,
+    };
 
-    setNotes(updatedNotes);
-    setNewNote({ title: '', content: '' });
-    setEditIndex(null);
-    setIsModalOpen(false);
-    setErrors({});
+    const url = editIndex !== null
+      ? 'http://localhost:5000/api/notes/update'
+      : 'http://localhost:5000/api/notes/createNote';
+
+    try {
+      const response = await axios.post(
+        url,
+        noteData,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          credentials: 'include',
+        }
+      );
+
+      if (!response.data.success && !response.data._id) {
+        throw new Error('Failed to save the note');
+      }
+
+      setRefresh(prev => !prev);
+      setNewNote({ title: '', description: '' });
+      setEditIndex(null);
+      setIsModalOpen(false);
+      setErrors({});
+      showSnackbar(editIndex !== null ? 'Note updated successfully!' : 'Note added successfully!');
+    } catch (error) {
+      showSnackbar(`Error: ${error.message}`);
+    }
   };
 
-  const requestDeleteNote = (index) => {
-    setDeleteDialog({ open: true, index });
+
+  const requestDeleteNote = async (index, note) => {
+    try {
+      const response = await axios.post(
+        `${url}notes/delete`,
+        { id: note._id },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          credentials: 'include',
+        }
+      );
+
+      console.log('Delete success:', response.data.message);
+      setDeleteDialog({ open: true, index });
+    } catch (error) {
+      if (error.response) {
+        console.error('Delete failed:', error.response.data.error);
+      } else {
+        console.error('Error deleting note:', error.message);
+      }
+    }
   };
 
   const confirmDeleteNote = () => {
@@ -122,12 +209,6 @@ export default function HomePage() {
   const handleSearch = (e) => {
     setSearchQuery(e.target.value);
   };
-
-  const filteredNotes = notes.filter(
-    (note) =>
-      note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      note.content.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   return (
     <main>
@@ -188,9 +269,9 @@ export default function HomePage() {
               error={!!errors.newNote && newNote.title.trim() === ''}
             />
             <TextField
-              label="Content"
-              name="content"
-              value={newNote.content}
+              label="Description"
+              name="description"
+              value={newNote.description}
               onChange={handleNoteChange}
               fullWidth
               multiline
@@ -198,8 +279,8 @@ export default function HomePage() {
               margin="dense"
               placeholder="Write your note here..."
               variant="outlined"
-              error={!!errors.newNote && newNote.content.trim() === ''}
-              helperText={`${newNote.content.length}/200${errors.newNote ? ` - ${errors.newNote}` : ''
+              error={!!errors.newNote && newNote.description.trim() === ''}
+              helperText={`${newNote.description.length}/200${errors.newNote ? ` - ${errors.newNote}` : ''
                 }`}
             />
           </DialogContent>
@@ -220,10 +301,7 @@ export default function HomePage() {
         </Dialog>
 
         {/* Delete Confirmation Dialog */}
-        <Dialog
-          open={deleteDialog.open}
-          onClose={cancelDelete}
-        >
+        <Dialog open={deleteDialog.open} onClose={cancelDelete}>
           <DialogTitle>Confirm Delete</DialogTitle>
           <DialogContent>
             <Typography>
@@ -251,62 +329,66 @@ export default function HomePage() {
         />
 
         {/* Notes List */}
+        {/* Notes List */}
         <Grid container spacing={3} alignItems="stretch" justifyContent="flex-start">
-          {filteredNotes.map((note, index) => (
-            <Grid item key={index}>
-              <Card
-                sx={{
-                  minWidth: 300,
-                  maxWidth: 300,
-                  minHeight: 200,
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  boxShadow: 2,
-                  borderRadius: 2,
-                  backgroundColor: '#fff'
-                }}
-              >
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
-                    {note.title}
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{ wordBreak: 'break-word', color: '#333', mt: 1 }}
-                  >
-                    {note.content}
-                  </Typography>
-                </CardContent>
-                <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
-                  <Button variant="outlined" size="small" onClick={() => editNote(index)}>
-                    Edit
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    size="small"
-                    onClick={() => requestDeleteNote(index)}
-                  >
-                    Delete
-                  </Button>
-                </CardActions>
-              </Card>
-            </Grid>
-          ))}
+          {notes
+            .filter(note =>
+              note.title.toLowerCase().includes(searchQuery.toLowerCase())
+            )
+            .map((note, index) => (
+              <Grid item key={index}>
+                <Card
+                  sx={{
+                    minWidth: 300,
+                    maxWidth: 300,
+                    minHeight: 200,
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    boxShadow: 2,
+                    borderRadius: 2,
+                    backgroundColor: '#fff'
+                  }}
+                >
+                  <CardContent sx={{ flexGrow: 1 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+                      {note.title}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ wordBreak: 'break-word', color: '#333', mt: 1 }}
+                    >
+                      {note.description}
+                    </Typography>
+                  </CardContent>
+                  <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
+                    <Button variant="outlined" size="small" onClick={() => editNote(index)}>
+                      Edit
+                    </Button>
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      size="small"
+                      onClick={() => requestDeleteNote(index, note)}
+                    >
+                      Delete
+                    </Button>
+                  </CardActions>
+                </Card>
+              </Grid>
+            ))}
         </Grid>
 
         {/* Snackbar Notification */}
         <Snackbar
-  anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-  open={snack.open}
-  onClose={handleCloseSnackbar}
-  message={snack.message}
-  autoHideDuration={2000}
-  key="bottomleft"
-/>
-
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+          open={snack.open}
+          onClose={handleCloseSnackbar}
+          message={snack.message}
+          autoHideDuration={2000}
+          key="bottomleft"
+        />
       </Box>
     </main>
   );

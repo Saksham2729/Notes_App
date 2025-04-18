@@ -1,56 +1,92 @@
-const Note = require("../model/notes");
-const { STATUS_CODE, MESSAGES } = require("../contant");
+import Note from '../model/notes.js';
+import { STATUS_CODE, MESSAGES } from '../contant.js';
 
-const getNotes = async (req, res) => {
-  const { userId } = req.params;
+/**
+ * Get all notes for a specific user.
+ *
+ * @async
+ * @function getNotes
+ * @param {Object} req - Express request object.
+ * @param {Object} req.body - Request body containing the user ID.
+ * @param {string} req.body.userId - ID of the user whose notes are to be fetched.
+ * @param {Object} res - Express response object.
+ * @returns {Promise<void>}
+ */
+export const getNotes = async (req, res) => {
+  const { userId } = req.body;
   try {
     const notes = await Note.find({ user: userId });
-    if (!notes || notes.length === 0) {
-      return res.status(404).json({ error: 'No notes found for this user' });
+    if (!notes || !notes.length) {
+      return res.status(STATUS_CODE.PAGE_NOT_FOUND).json({ error: MESSAGES.NO_NOTE });
     }
-    res.status(200).json(notes);
+    res.status(STATUS_CODE.OK).json(notes);
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(STATUS_CODE.SERVER_ERROR).json({ error: MESSAGES.SERVER_ERROR });
   }
 };
 
-
-
-const createNote = async (req, res) => {
-  const { title, description } = req.body;
-
-  if (!title || !description) {
-    return res.status(STATUS_CODE.BAD_REQUEST).json({ error: MESSAGES.REQUIRED_FIELDS });
-  }
-
+/**
+ * Create a new note.
+ *
+ * @async
+ * @function createNote
+ * @param {Object} req - Express request object.
+ * @param {Object} req.body - Request body containing note details.
+ * @param {string} req.body.title - Title of the note.
+ * @param {string} req.body.description - Description of the note.
+ * @param {Object} req.user - Authenticated user object.
+ * @param {string} req.user.id - ID of the authenticated user.
+ * @param {Object} res - Express response object.
+ * @param {Function} next - Express next middleware function.
+ * @returns {Promise<void>}
+ */
+export const createNote = async (req, res, next) => {
   try {
-    const note = new Note({
-      user: req.user.id,
-      title,
-      description,
-    });
+    const { title = '', description } = req.body;
+    const { id: userId } = req.user;
 
-    const savedNote = await note.save();
-    res.status(STATUS_CODE.CREATED).json(savedNote);
-  } catch (err) {
-    res.status(STATUS_CODE.SERVER_ERROR).json({ error: "Failed to create note." });
+    if (!title?.trim()) {
+      return next(errorHandler(STATUS_CODE.BAD_REQUEST, "Title is required"));
+    }
+
+    if (!description?.trim()) {
+      return next(errorHandler(STATUS_CODE.BAD_REQUEST, "Description is required"));
+    }
+
+    const note = await Note.create({ title, description, user: userId });
+
+    res.status(STATUS_CODE.CREATED).json({
+      success: true,
+      message: MESSAGES.NOTE_ADDED,
+      note,
+    });
+  } catch (error) {
+    next(error);
   }
 };
 
-const updateNote = async (req, res) => {
-  const { id } = req.params;
-  const { title, description } = req.body;
+/**
+ * Update an existing note.
+ *
+ * @async
+ * @function updateNote
+ * @param {Object} req - Express request object.
+ * @param {Object} req.body - Request body containing note details.
+ * @param {string} req.body.id - ID of the note to be updated.
+ * @param {string} [req.body.title] - New title (optional).
+ * @param {string} [req.body.description] - New description (optional).
+ * @param {Object} res - Express response object.
+ * @returns {Promise<void>}
+ */
+export const updateNote = async (req, res) => {
+  const { id, title, description } = req.body;
 
   try {
     const note = await Note.findById(id);
 
     if (!note) {
-      return res.status(STATUS_CODE.BAD_REQUEST).json({ error: "Note not found." });
-    }
-
-    if (note.user.toString() !== req.user.id) {
-      return res.status(STATUS_CODE.UNAUTHORIZED).json({ error: "Not authorized." });
+      return res.status(STATUS_CODE.BAD_REQUEST).json({ error: MESSAGES.NO_NOTE });
     }
 
     note.title = title || note.title;
@@ -59,36 +95,43 @@ const updateNote = async (req, res) => {
     const updatedNote = await note.save();
     res.status(STATUS_CODE.OK).json(updatedNote);
   } catch (err) {
-    res.status(STATUS_CODE.SERVER_ERROR).json({ error: "Failed to update note." });
+    res.status(STATUS_CODE.SERVER_ERROR).json({ error: MESSAGES.NOT_UPDATE_NOTE });
   }
 };
 
-const deleteNote = async (req, res) => {
-  const { id } = req.params;
-  console.log(id)
+/**
+ * Delete an existing note.
+ *
+ * @async
+ * @function deleteNote
+ * @param {Object} req - Express request object.
+ * @param {Object} req.body - Request body containing note ID.
+ * @param {string} req.body.id - ID of the note to delete.
+ * @param {Object} req.user - Authenticated user object.
+ * @param {string} req.user.id - ID of the authenticated user.
+ * @param {Object} res - Express response object.
+ * @returns {Promise<void>}
+ */
+export const deleteNote = async (req, res) => {
+  const { id } = req.body;
 
   try {
     const note = await Note.findById(id);
-    console.log(note)
 
     if (!note) {
-      return res.status(STATUS_CODE.BAD_REQUEST).json({ error: "Note not found." });
+      return res.status(STATUS_CODE.BAD_REQUEST).json({ error: MESSAGES.NO_NOTE });
     }
 
+    // Check ownership
     if (note.user.toString() !== req.user.id) {
-      return res.status(STATUS_CODE.UNAUTHORIZED).json({ error: "Not authorized." });
+      return res.status(STATUS_CODE.UNAUTHORIZED).json({ error: MESSAGES.NOT_AUTH });
     }
 
-    await note.remove();
-    res.status(STATUS_CODE.OK).json({ message: "Note deleted successfully." });
-  } catch (err) {
-    res.status(STATUS_CODE.SERVER_ERROR).json({ error: "Failed to delete note." });
-  }
-};
+    await note.deleteOne();
 
-module.exports = {
-  getNotes,
-  createNote,
-  updateNote,
-  deleteNote,
+    res.status(STATUS_CODE.CREATED).json({ message: MESSAGES.NOTE_DELETE });
+  } catch (err) {
+    console.error("Delete Note Error:", err);
+    res.status(STATUS_CODE.SERVER_ERROR).json({ error: MESSAGES.FAIL_TO_DELETE });
+  }
 };
